@@ -28,7 +28,7 @@ func run() error {
 		return err
 	}
 
-	if err := validator.Process(); err != nil {
+	if err := validator.ValidateGraph(); err != nil {
 		return err
 	}
 

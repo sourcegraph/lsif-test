@@ -44,6 +44,6 @@ func NewValidator(schema *gojsonschema.Schema, disableJSONSchema bool) *Validato
 	return validator
 }
 
-func (v *Validator) Stats() (int, int) {
-	return len(v.vertices), len(v.edges)
+func (v *Validator) Stats() (int, int, int) {
+	return len(v.vertices), len(v.edges), len(v.errors)
 }

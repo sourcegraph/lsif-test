@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/alecthomas/kingpin"
+	"github.com/efritz/pentimento"
 	"github.com/sourcegraph/lsif-test/assets"
 	"github.com/sourcegraph/lsif-test/validation"
 	"github.com/xeipuuv/gojsonschema"
@@ -33,6 +35,8 @@ func realMain() error {
 
 	defer (*dumpFile).Close()
 
+	header := fmt.Sprintf("Validating LSIF dump at %s:", (*dumpFile).Name())
+
 	schema, err := getSchema()
 	if err != nil {
 		return fmt.Errorf("schema: %v", err)
@@ -42,41 +46,83 @@ func realMain() error {
 	scanner := bufio.NewScanner(*dumpFile)
 	validator := validation.NewValidator(schema, *disableJSONSchema)
 
-	for scanner.Scan() {
-		if !validator.ValidateLine(scanner.Text()) {
-			valid = false
+	formatStats := func() string {
+		numVertices, numEdges, numErrors := validator.Stats()
+		return fmt.Sprintf(
+			"Processed %d lines, %d vertices and %d edges.\nFound %d errors.\n\n",
+			numVertices+numEdges,
+			numVertices,
+			numEdges,
+			numErrors,
+		)
+	}
 
-			if *stopOnError {
-				break
+	withProgressUpdate := func(status string, f func()) {
+		pentimento.PrintProgress(func(p *pentimento.Printer) error {
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				f()
+			}()
+
+		loop:
+			for {
+				content := pentimento.NewContent()
+				content.AddLine("%s %s%s", header, status, pentimento.Dots)
+				content.AddLine(formatStats())
+				p.WriteContent(content)
+
+				select {
+				case <-done:
+					break loop
+				case <-time.After(time.Second / 4):
+				}
+			}
+
+			p.Reset()
+			return nil
+		})
+	}
+
+	withProgressUpdate("processing individual lines", func() {
+		for scanner.Scan() {
+			if !validator.ValidateLine(scanner.Text()) {
+				valid = false
+				if *stopOnError {
+					break
+				}
 			}
 		}
-	}
+	})
 
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("scanner: %v", err)
 	}
 
 	if valid {
-		if !validator.ValidateGraph(*stopOnError) {
-			valid = false
-		}
+		withProgressUpdate("processing relationships", func() {
+			if !validator.ValidateGraph(*stopOnError) {
+				valid = false
+			}
+		})
 	}
 
-	numVertices, numEdges := validator.Stats()
-	fmt.Printf("Processed %d and %d edges\n", numVertices, numEdges)
+	fmt.Printf("%s done.\n", header)
+	fmt.Printf(formatStats())
 
-	errors := validator.Errors()
-	fmt.Printf("Found %d errors\n\n", len(errors))
-
-	for i, err := range errors {
+	hasErrors := false
+	for i, err := range validator.Errors() {
+		hasErrors = true
 		fmt.Printf("%d) %s\n", i+1, err.Message)
 		for _, lineContext := range err.RelevantLines {
 			fmt.Printf("\ton line #%d: %s\n", lineContext.LineIndex, lineContext.LineText)
 		}
 	}
 
-	if len(errors) > 0 {
+	if hasErrors {
 		fmt.Printf("\n")
+	} else {
+		fmt.Printf(":)\n")
 	}
 
 	return nil

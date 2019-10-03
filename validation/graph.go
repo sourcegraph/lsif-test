@@ -6,7 +6,7 @@ import (
 	"github.com/sourcegraph/lsif-test/elements"
 )
 
-var whitelist = []string{"metaData", "project"}
+var reachabilityIgnoreList = []string{"metaData", "project", "$event"}
 
 func (v *Validator) ValidateGraph(stopOnError bool) bool {
 	// TODO - obey stopOnError for these functions a swell
@@ -67,7 +67,7 @@ func (v *Validator) ensureReachability() bool {
 
 outer:
 	for id, lineContext := range v.vertices {
-		for _, label := range whitelist {
+		for _, label := range reachabilityIgnoreList {
 			if lineContext.Element.Label == label {
 				continue outer
 			}

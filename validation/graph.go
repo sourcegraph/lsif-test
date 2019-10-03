@@ -140,7 +140,7 @@ func (v *Validator) ensureDisjoint(documentID elements.ID, documentRanges []*ele
 		// TODO - can they touch?
 		if r1.End.Line > r2.Start.Line || (r1.End.Line == r2.Start.Line && r1.End.Character > r2.Start.Character) {
 			valid = false
-			v.addError("ranges overlap").Link(v.vertices[r1.ID], v.vertices[r2.ID])
+			v.addError("ranges overlap in document %s", documentID).Link(v.vertices[r1.ID], v.vertices[r2.ID])
 		}
 	}
 

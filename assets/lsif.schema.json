@@ -4726,11 +4726,7 @@
     }
   },
   "oneOf": [
-    {
-      "$ref":"#/definitions/Vertex"
-    },
-    {
-      "$ref": "#/definitions/Edge"
-    }
+    {"$ref": "#/definitions/Vertex"},
+    {"$ref": "#/definitions/Edge"}
   ]
 }

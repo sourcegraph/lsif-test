@@ -6,30 +6,32 @@ import (
 	"github.com/sourcegraph/lsif-test/elements"
 )
 
-func (v *Validator) getOwnershipMap() (map[elements.ID]elements.ID, error) {
+func (v *Validator) getOwnershipMap() (map[elements.ID]elements.ID, bool) {
 	if v.ownershipMap != nil {
-		return v.ownershipMap, nil
+		return v.ownershipMap, true
 	}
 
 	ownershipMap := map[elements.ID]elements.ID{}
-	err := v.forEachContainsEdge(func(line string, edge *elements.Edge1n) error {
+	ok := v.forEachContainsEdge(func(line string, edge *elements.Edge1n) bool {
 		for _, inV := range edge.InVs {
 			if _, ok := ownershipMap[inV]; ok {
-				return fmt.Errorf("range %s claimed by multiple documents", inV)
+				// TODO - more context
+				v.addError(ValidationError{Message: fmt.Sprintf("range %s claimed by multiple documents", inV)})
+				return false
 			}
 
 			ownershipMap[inV] = edge.OutV
 		}
 
-		return nil
+		return true
 	})
 
-	if err != nil {
-		return nil, err
+	if !ok {
+		return nil, false
 	}
 
 	v.ownershipMap = ownershipMap
-	return ownershipMap, nil
+	return ownershipMap, true
 }
 
 func invertOwnershipMap(m map[elements.ID]elements.ID) map[elements.ID][]elements.ID {

@@ -7,12 +7,10 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-type LineValidator func(line string) error
-type ElementValidator func(line string, element *elements.Element) error
-
 type Validator struct {
 	schema            *gojsonschema.Schema
 	disableJSONSchema bool
+	errors            []ValidationError
 	elementValidators map[string]ElementValidator
 	vertexValidators  map[string]LineValidator
 	edgeValidators    map[string]LineValidator
@@ -23,6 +21,9 @@ type Validator struct {
 	lines             int
 	ownershipMap      map[elements.ID]elements.ID
 }
+
+type ElementValidator func(line string, element *elements.Element) bool
+type LineValidator func(line string) bool
 
 func NewValidator(schema *gojsonschema.Schema, disableJSONSchema bool) *Validator {
 	validator := &Validator{

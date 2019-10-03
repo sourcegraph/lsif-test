@@ -24,6 +24,7 @@ func realMain() error {
 	app := kingpin.New("lsif-go", "lsif-validate is validator for LSIF indexer output.").Version(version)
 	dumpFile := app.Arg("dump-file", "The LSIf output to validate.").Default("data.lsif").File()
 	disableJSONSchema := app.Flag("disable-jsonschema", "Turn off JSON schema validation").Bool()
+	stopOnError := app.Flag("stop-on-error", "Stop validation after the first error.").Bool()
 
 	_, err := app.Parse(os.Args[1:])
 	if err != nil {
@@ -37,12 +38,17 @@ func realMain() error {
 		return fmt.Errorf("schema: %v", err)
 	}
 
+	allOk := true
+	scanner := bufio.NewScanner(*dumpFile)
 	validator := validation.NewValidator(schema, *disableJSONSchema)
 
-	scanner := bufio.NewScanner(*dumpFile)
 	for scanner.Scan() {
-		if err := validator.ValidateLine(scanner.Text()); err != nil {
-			return err
+		if !validator.ValidateLine(scanner.Text()) {
+			allOk = false
+
+			if *stopOnError {
+				break
+			}
 		}
 	}
 
@@ -50,8 +56,26 @@ func realMain() error {
 		return fmt.Errorf("scanner: %v", err)
 	}
 
-	if err := validator.ValidateGraph(); err != nil {
-		return err
+	if allOk {
+		if !validator.ValidateGraph(*stopOnError) {
+			allOk = false
+		}
+	}
+
+	if !allOk {
+		errors := validator.Errors()
+		fmt.Printf("Found %d errors\n\n", len(errors))
+
+		for i, err := range errors {
+			fmt.Printf("%d) %s\n", i+1, err.Message)
+			if err.LineText != "" {
+				fmt.Printf("\ton line #%d: %s\n", err.LineIndex, err.LineText)
+			}
+		}
+
+		fmt.Printf("\n")
+	} else {
+		fmt.Printf("LSIF is valid!\n")
 	}
 
 	return nil

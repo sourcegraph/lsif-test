@@ -9,7 +9,7 @@ type ID struct {
 	Value string
 }
 
-func (id ID) String() string{
+func (id ID) String() string {
 	return id.Value
 }
 

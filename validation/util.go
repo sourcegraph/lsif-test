@@ -4,54 +4,48 @@ import (
 	"github.com/sourcegraph/lsif-test/elements"
 )
 
-func (v *Validator) forEachVertex(label string, f func(line string, element *elements.Element) bool) bool {
-	allOk := true
-	for _, line := range v.edges {
-		edge, err := elements.ParseElement(line)
-		if err != nil {
-			// all lines have already been parsed
-			panic("Unreachable!")
-		}
-
-		if edge.Label == label {
-			if !f(line, edge) {
-				allOk = false
+func (v *Validator) forEachVertex(label string, f func(lineContext LineContext) bool) bool {
+	valid := true
+	for _, lineContext := range v.vertices {
+		if lineContext.Element.Label == label {
+			if !f(lineContext) {
+				valid = false
 			}
 		}
 	}
 
-	return allOk
+	return valid
 }
 
-func (v *Validator) forEachEdge(label string, f func(line string, edge *elements.Edge1n) bool) bool {
-	allOk := true
-	for _, line := range v.edges {
-		edge, err := elements.ParseEdge(line)
+func (v *Validator) forEachEdge(label string, f func(lineContext LineContext, edge *elements.Edge1n) bool) bool {
+	valid := true
+	for _, lineContext := range v.edges {
+		edge, err := elements.ParseEdge(lineContext.LineText)
 		if err != nil {
-			// all lines have already been parsed
+			// already parsed
 			panic("Unreachable!")
 		}
 
 		if edge.Label == label {
-			if !f(line, edge) {
-				allOk = false
+			if !f(lineContext, edge) {
+				valid = false
 			}
 		}
 	}
 
-	return allOk
+	return valid
 }
 
-func (v *Validator) forEachContainsEdge(f func(line string, edge *elements.Edge1n) bool) bool {
-	return v.forEachEdge("contains", func(line string, edge *elements.Edge1n) bool {
-		parentElement, ok := v.vertexElement(edge.OutV)
+func (v *Validator) forEachContainsEdge(f func(lineContext LineContext, edge *elements.Edge1n) bool) bool {
+	return v.forEachEdge("contains", func(lineContext LineContext, edge *elements.Edge1n) bool {
+		parentElement, ok := v.vertexElement(lineContext, edge.OutV)
 		if !ok {
-			// all lines have already been parsed
+			// already parsed
 			panic("Unreachable!")
 		}
 
 		if parentElement.Label == "document" {
-			return f(line, edge)
+			return f(lineContext, edge)
 		}
 
 		return true

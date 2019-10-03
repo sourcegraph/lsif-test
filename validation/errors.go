@@ -1,26 +1,36 @@
 package validation
 
+import "fmt"
+
 type ValidationError struct {
-	Message   string
-	LineText  string
-	LineIndex int
+	Message       string
+	RelevantLines []LineContext
 }
 
-func (v *Validator) Errors() []ValidationError {
+func NewError(format string, args ...interface{}) *ValidationError {
+	return &ValidationError{
+		Message: fmt.Sprintf(format, args...),
+	}
+}
+
+func (ve *ValidationError) At(lineText string, lineIndex int) *ValidationError {
+	return ve.Link(LineContext{
+		LineText:  lineText,
+		LineIndex: lineIndex,
+	})
+}
+
+func (ve *ValidationError) Link(lineContexts ...LineContext) *ValidationError {
+	ve.RelevantLines= append(ve.RelevantLines, lineContexts...)
+	return ve
+}
+
+func (v *Validator) Errors() []*ValidationError {
 	return v.errors[:]
 }
 
-//
-// Helpers
-
-func (v *Validator) addError(err ValidationError) {
-	v.errors = append(v.errors, err)
-}
-
-func (v *Validator) addLineError(line string, message string) {
-	v.addError(ValidationError{
-		Message:   message,
-		LineText:  line,
-		LineIndex: v.lines,
-	})
+func (v *Validator) addError(format string, args ...interface{}) *ValidationError {
+	err := NewError(format, args...)
+	v.errors = append(v.errors,err)
+	return err
 }

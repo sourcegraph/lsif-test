@@ -38,13 +38,13 @@ func realMain() error {
 		return fmt.Errorf("schema: %v", err)
 	}
 
-	allOk := true
+	valid := true
 	scanner := bufio.NewScanner(*dumpFile)
 	validator := validation.NewValidator(schema, *disableJSONSchema)
 
 	for scanner.Scan() {
 		if !validator.ValidateLine(scanner.Text()) {
-			allOk = false
+			valid = false
 
 			if *stopOnError {
 				break
@@ -56,26 +56,27 @@ func realMain() error {
 		return fmt.Errorf("scanner: %v", err)
 	}
 
-	if allOk {
+	if valid {
 		if !validator.ValidateGraph(*stopOnError) {
-			allOk = false
+			valid = false
 		}
 	}
 
-	if !allOk {
-		errors := validator.Errors()
-		fmt.Printf("Found %d errors\n\n", len(errors))
+	numVertices, numEdges := validator.Stats()
+	fmt.Printf("Processed %d and %d edges\n", numVertices, numEdges)
 
-		for i, err := range errors {
-			fmt.Printf("%d) %s\n", i+1, err.Message)
-			if err.LineText != "" {
-				fmt.Printf("\ton line #%d: %s\n", err.LineIndex, err.LineText)
-			}
+	errors := validator.Errors()
+	fmt.Printf("Found %d errors\n\n", len(errors))
+
+	for i, err := range errors {
+		fmt.Printf("%d) %s\n", i+1, err.Message)
+		for _, lineContext := range err.RelevantLines {
+			fmt.Printf("\ton line #%d: %s\n", lineContext.LineIndex, lineContext.LineText)
 		}
+	}
 
+	if len(errors) > 0 {
 		fmt.Printf("\n")
-	} else {
-		fmt.Printf("LSIF is valid!\n")
 	}
 
 	return nil

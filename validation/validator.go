@@ -10,31 +10,40 @@ import (
 type Validator struct {
 	schema            *gojsonschema.Schema
 	disableJSONSchema bool
-	errors            []ValidationError
-	elementValidators map[string]ElementValidator
-	vertexValidators  map[string]LineValidator
-	edgeValidators    map[string]LineValidator
-	vertices          map[elements.ID]string
-	edges             map[elements.ID]string
+	errors            []*ValidationError
+	elementValidators map[string]ValidatorFunc
+	vertexValidators  map[string]ValidatorFunc
+	edgeValidators    map[string]ValidatorFunc
+	vertices          map[elements.ID]LineContext
+	edges             map[elements.ID]LineContext
 	hasMetadata       bool
 	projectRoot       *url.URL
 	lines             int
-	ownershipMap      map[elements.ID]elements.ID
+	ownershipMap      map[elements.ID]ownershipContext
 }
 
-type ElementValidator func(line string, element *elements.Element) bool
-type LineValidator func(line string) bool
+type LineContext struct {
+	Element   *elements.Element
+	LineText  string
+	LineIndex int
+}
+
+type ValidatorFunc func(lineContext LineContext) bool
 
 func NewValidator(schema *gojsonschema.Schema, disableJSONSchema bool) *Validator {
 	validator := &Validator{
 		schema:            schema,
 		disableJSONSchema: disableJSONSchema,
-		vertices:          map[elements.ID]string{},
-		edges:             map[elements.ID]string{},
+		vertices:          map[elements.ID]LineContext{},
+		edges:             map[elements.ID]LineContext{},
 	}
 
 	validator.elementValidators = validator.setupElementValidators()
 	validator.vertexValidators = validator.setupVertexValidators()
 	validator.edgeValidators = validator.setupEdgeValidators()
 	return validator
+}
+
+func (v *Validator) Stats() (int, int) {
+	return len(v.vertices), len(v.edges)
 }

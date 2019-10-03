@@ -1,32 +1,43 @@
 package validation
 
 import (
-	"fmt"
-
 	"github.com/sourcegraph/lsif-test/elements"
 )
 
-func (v *Validator) getOwnershipMap() (map[elements.ID]elements.ID, bool) {
+type ownershipContext struct {
+	outV        elements.ID
+	lineContext LineContext
+}
+
+func (v *Validator) getOwnershipMap() (map[elements.ID]ownershipContext, bool) {
 	if v.ownershipMap != nil {
 		return v.ownershipMap, true
 	}
 
-	ownershipMap := map[elements.ID]elements.ID{}
-	ok := v.forEachContainsEdge(func(line string, edge *elements.Edge1n) bool {
+	ownershipMap := map[elements.ID]ownershipContext{}
+	valid := v.forEachContainsEdge(func(lineContext LineContext, edge *elements.Edge1n) bool {
+		valid := true
 		for _, inV := range edge.InVs {
-			if _, ok := ownershipMap[inV]; ok {
-				// TODO - more context
-				v.addError(ValidationError{Message: fmt.Sprintf("range %s claimed by multiple documents", inV)})
-				return false
+			if previousOwner, ok := ownershipMap[inV]; ok {
+				v.addError("range %s already claimed by document %s", inV, previousOwner.outV).Link(
+					lineContext,
+					previousOwner.lineContext,
+				)
+
+				valid = false
+				continue
 			}
 
-			ownershipMap[inV] = edge.OutV
+			ownershipMap[inV] = ownershipContext{
+				outV:        edge.OutV,
+				lineContext: lineContext,
+			}
 		}
 
-		return true
+		return valid
 	})
 
-	if !ok {
+	if !valid {
 		return nil, false
 	}
 
@@ -34,10 +45,10 @@ func (v *Validator) getOwnershipMap() (map[elements.ID]elements.ID, bool) {
 	return ownershipMap, true
 }
 
-func invertOwnershipMap(m map[elements.ID]elements.ID) map[elements.ID][]elements.ID {
+func invertOwnershipMap(m map[elements.ID]ownershipContext) map[elements.ID][]elements.ID {
 	inverted := map[elements.ID][]elements.ID{}
 	for k, v := range m {
-		inverted[v] = append(inverted[v], k)
+		inverted[v.outV] = append(inverted[v.outV], k)
 	}
 
 	return inverted

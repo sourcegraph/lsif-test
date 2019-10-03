@@ -1,7 +1,6 @@
 package validation
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -10,82 +9,91 @@ import (
 )
 
 func (v *Validator) ValidateLine(line string) bool {
-	ok := true
-	if v.lines > 0 && !v.hasMetadata {
-		ok = false
-		// TODO - more context
-		v.addError(ValidationError{Message: "metaData vertex must occur before any other element"})
+	defer func() { v.lines++ }()
+
+	valid := true
+	if v.lines == 1 && !v.hasMetadata {
+		valid = false
+		v.addError("metaData vertex must occur before any other element").At(line, v.lines)
 	}
 
-	v.lines++
-
 	if !v.disableJSONSchema {
-		if !v.validateSchema(line) {
+		result, err := v.schema.Validate(gojsonschema.NewStringLoader(line))
+		if err != nil {
+			v.addError("failed schema validation").At(line, v.lines)
+			return false
+		}
+
+		if !result.Valid() {
+			// TODO - get message from result
+			v.addError("failed schema validation").At(line, v.lines)
 			return false
 		}
 	}
 
 	element, err := elements.ParseElement(line)
 	if err != nil {
-		v.addLineError(line, "failed to parse element")
+		v.addError("failed to parse element").At(line, v.lines)
 		return false
 	}
 
-	if !v.elementValidators[element.Type](line, element) {
-		ok = false
+	lineContext := LineContext{
+		Element:   element,
+		LineText:  line,
+		LineIndex: v.lines,
 	}
 
-	return ok
+	return !v.elementValidators[element.Type](lineContext) && valid
 }
 
 //
 // Element Validators
 
-func (v *Validator) setupElementValidators() map[string]ElementValidator {
-	return map[string]ElementValidator{
+func (v *Validator) setupElementValidators() map[string]ValidatorFunc {
+	return map[string]ValidatorFunc{
 		"vertex": v.validateVertex,
 		"edge":   v.validateEdge,
 	}
 }
 
-func (v *Validator) validateVertex(line string, element *elements.Element) bool {
-	ok1 := v.validate(v.vertexValidators, element.Label, line)
-	ok2 := v.stashVertex(line, element.ID)
+func (v *Validator) validateVertex(lineContext LineContext) bool {
+	ok1 := v.validate(v.vertexValidators, lineContext)
+	ok2 := v.stashVertex(lineContext)
 	return ok1 && ok2
 }
 
-func (v *Validator) validateEdge(line string, element *elements.Element) bool {
-	ok1 := v.validate(v.edgeValidators, element.Label, line)
-	ok2 := v.stashEdge(line, element.ID)
+func (v *Validator) validateEdge(lineContext LineContext) bool {
+	ok1 := v.validate(v.edgeValidators, lineContext)
+	ok2 := v.stashEdge(lineContext)
 	return ok1 && ok2
 }
 
 //
 // Vertex Validators
 
-func (v *Validator) setupVertexValidators() map[string]LineValidator {
-	return map[string]LineValidator{
+func (v *Validator) setupVertexValidators() map[string]ValidatorFunc {
+	return map[string]ValidatorFunc{
 		"metaData": v.validateMetaDataVertex,
 		"document": v.validateDocumentVertex,
 		"range":    v.validateRangeVertex,
 	}
 }
 
-func (v *Validator) validateMetaDataVertex(line string) bool {
+func (v *Validator) validateMetaDataVertex(lineContext LineContext) bool {
 	if v.hasMetadata {
-		v.addLineError(line, "metadata vertex defined multiple times")
+		v.addError("metadata vertex defined multiple times").Link(lineContext)
 		return false
 	}
 
-	metaData, err := elements.ParseMetaData(line)
+	metaData, err := elements.ParseMetaData(lineContext.LineText)
 	if err != nil {
-		v.addLineError(line, "failed to parse metadata element")
+		v.addError("failed to parse metadata element").Link(lineContext)
 		return false
 	}
 
 	url, err := url.Parse(metaData.ProjectRoot)
 	if err != nil {
-		v.addLineError(line, "project root is not a valid URL")
+		v.addError("project root is not a valid URL").Link(lineContext)
 		return false
 	}
 
@@ -94,31 +102,31 @@ func (v *Validator) validateMetaDataVertex(line string) bool {
 	return true
 }
 
-func (v *Validator) validateDocumentVertex(line string) bool {
-	document, err := elements.ParseDocument(line)
+func (v *Validator) validateDocumentVertex(lineContext LineContext) bool {
+	document, err := elements.ParseDocument(lineContext.LineText)
 	if err != nil {
-		v.addLineError(line, "failed to parse document element")
+		v.addError("failed to parse document element").Link(lineContext)
 		return false
 	}
 
 	url, err := url.Parse(document.URI)
 	if err != nil {
-		v.addLineError(line, "document uri is not a valid URL")
+		v.addError("document uri is not a valid URL").Link(lineContext)
 		return false
 	}
 
 	if v.projectRoot != nil && !strings.HasPrefix(url.String(), v.projectRoot.String()) {
-		v.addLineError(line, "document is not relative to project root")
+		v.addError("document is not relative to project root").Link(lineContext)
 		return false
 	}
 
 	return true
 }
 
-func (v *Validator) validateRangeVertex(line string) bool {
-	documentRange, err := elements.ParseDocumentRange(line)
+func (v *Validator) validateRangeVertex(lineContext LineContext) bool {
+	documentRange, err := elements.ParseDocumentRange(lineContext.LineText)
 	if err != nil {
-		v.addLineError(line, "failed to parse range")
+		v.addError("failed to parse range").Link(lineContext)
 		return false
 	}
 
@@ -131,19 +139,19 @@ func (v *Validator) validateRangeVertex(line string) bool {
 
 	for _, bound := range bounds {
 		if bound < 0 {
-			v.addLineError(line, "illegal range bounds")
+			v.addError("illegal range bounds").Link(lineContext)
 			return false
 		}
 	}
 
 	if documentRange.Start.Line > documentRange.End.Line {
-		v.addLineError(line, "illegal range extents")
+		v.addError("illegal range extents").Link(lineContext)
 		return false
 	}
 
 	if documentRange.Start.Line == documentRange.End.Line {
 		if documentRange.Start.Character > documentRange.End.Character {
-			v.addLineError(line, "illegal range extents")
+			v.addError("illegal range extents").Link(lineContext)
 			return false
 		}
 	}
@@ -154,8 +162,8 @@ func (v *Validator) validateRangeVertex(line string) bool {
 //
 // Edge Validators
 
-func (v *Validator) setupEdgeValidators() map[string]LineValidator {
-	return map[string]LineValidator{
+func (v *Validator) setupEdgeValidators() map[string]ValidatorFunc {
+	return map[string]ValidatorFunc{
 		"contains":                v.validateContainsEdge,
 		"item":                    v.validateItemEdge,
 		"next":                    v.validateEdge11([]string{"range", "resultSet"}, "resultSet"),
@@ -168,26 +176,26 @@ func (v *Validator) setupEdgeValidators() map[string]LineValidator {
 	}
 }
 
-func (v *Validator) validateContainsEdge(line string) bool {
-	edge, err := elements.ParseEdge1n(line)
+func (v *Validator) validateContainsEdge(lineContext LineContext) bool {
+	edge, err := elements.ParseEdge1n(lineContext.LineText)
 	if err != nil {
-		v.addLineError(line, "failed to parse edge")
+		v.addError("failed to parse edge").Link(lineContext)
 		return false
 	}
 
 	if len(edge.InVs) == 0 {
-		v.addLineError(line, "inVs is an empty list")
+		v.addError("inVs is an empty list").Link(lineContext)
 		return false
 	}
 
-	parentElement, ok := v.vertexElement(edge.OutV)
+	parentElement, ok := v.vertexElement(lineContext, edge.OutV)
 	if !ok {
 		return false
 	}
 
 	if parentElement.Label == "document" {
 		for _, inV := range edge.InVs {
-			if !v.ensureVertexType(inV, []string{"range"}) {
+			if !v.ensureVertexType(lineContext, inV, []string{"range"}) {
 				return false
 			}
 		}
@@ -196,19 +204,19 @@ func (v *Validator) validateContainsEdge(line string) bool {
 	return true
 }
 
-func (v *Validator) validateItemEdge(line string) bool {
-	edge, err := elements.ParseItemEdge(line)
+func (v *Validator) validateItemEdge(lineContext LineContext) bool {
+	edge, err := elements.ParseItemEdge(lineContext.LineText)
 	if err != nil {
-		v.addLineError(line, "failed to parse item edge")
+		v.addError("failed to parse item edge").Link(lineContext)
 		return false
 	}
 
 	if len(edge.InVs) == 0 {
-		v.addLineError(line, "inVs is an empty list")
+		v.addError("inVs is an empty list").Link(lineContext)
 		return false
 	}
 
-	element, ok := v.vertexElement(edge.OutV)
+	element, ok := v.vertexElement(lineContext, edge.OutV)
 	if !ok {
 		return false
 	}
@@ -218,12 +226,12 @@ func (v *Validator) validateItemEdge(line string) bool {
 		labels = append(labels, "referenceResult")
 	}
 
-	if !v.ensureVertexType(edge.Document, []string{"document"}) {
+	if !v.ensureVertexType(lineContext, edge.Document, []string{"document"}) {
 		return false
 	}
 
 	for _, inV := range edge.InVs {
-		if !v.ensureVertexType(inV, labels) {
+		if !v.ensureVertexType(lineContext, inV, labels) {
 			return false
 		}
 	}
@@ -231,19 +239,19 @@ func (v *Validator) validateItemEdge(line string) bool {
 	return true
 }
 
-func (v *Validator) validateEdge11(sources []string, result string) LineValidator {
-	return func(line string) bool {
-		edge, err := elements.ParseEdge11(line)
+func (v *Validator) validateEdge11(sources []string, result string) ValidatorFunc {
+	return func(lineContext LineContext) bool {
+		edge, err := elements.ParseEdge11(lineContext.LineText)
 		if err != nil {
-			v.addLineError(line, "failed to parse edge")
+			v.addError("failed to parse edge").Link(lineContext)
 			return false
 		}
 
-		if !v.ensureVertexType(edge.OutV, sources) {
+		if !v.ensureVertexType(lineContext, edge.OutV, sources) {
 			return false
 		}
 
-		if !v.ensureVertexType(edge.InV, []string{result}) {
+		if !v.ensureVertexType(lineContext, edge.InV, []string{result}) {
 			return false
 		}
 
@@ -254,91 +262,60 @@ func (v *Validator) validateEdge11(sources []string, result string) LineValidato
 //
 // Helpers
 
-func (v *Validator) validate(validators map[string]LineValidator, label string, line string) bool {
-	if f, ok := validators[label]; ok {
-		return f(line)
+func (v *Validator) validate(validators map[string]ValidatorFunc, lineContext LineContext) bool {
+	if f, ok := validators[lineContext.Element.Label]; ok {
+		return f(lineContext)
 	}
 
 	return true
 }
 
-func (v *Validator) validateSchema(line string) bool {
-	result, err := v.schema.Validate(gojsonschema.NewStringLoader(line))
-	if err != nil {
-		v.addLineError(line, "failed schema validation")
-		return false
-	}
-
-	if !result.Valid() {
-		// TODO - better messages here
-		v.addLineError(line, "failed schema validation")
-		return false
-	}
-
-	return true
-}
-
-func (v *Validator) vertexElement(id elements.ID) (*elements.Element, bool) {
-	line, ok := v.vertices[id]
+func (v *Validator) vertexElement(parentLineContext LineContext, id elements.ID) (*elements.Element, bool) {
+	lineContext, ok := v.vertices[id]
 	if !ok {
-		// TODO - more context
-		v.addError(ValidationError{Message: fmt.Sprintf("no such vertex %s", id)})
+		v.addError("no such vertex %s", id).Link(parentLineContext)
 		return nil, false
 	}
 
-	element, err := elements.ParseElement(line)
-	if err != nil {
-		// TODO - more context
-		v.addError(ValidationError{Message: fmt.Sprintf("failed to parse vertex with ID %s", id)})
-		return nil, false
-	}
-
-	return element, true
+	return lineContext.Element, true
 }
 
-func (v *Validator) ensureVertexType(id elements.ID, labels []string) bool {
-	element, ok := v.vertexElement(id)
+func (v *Validator) ensureVertexType(parentLineContext LineContext, id elements.ID, labels []string) bool {
+	lineContext, ok := v.vertices[id]
 	if !ok {
+		v.addError("no such vertex %s", id).Link(parentLineContext)
 		return false
 	}
 
 	for _, label := range labels {
-		if element.Label == label {
+		if lineContext.Element.Label == label {
 			return true
 		}
 	}
 
-	// TODO - more context
-	v.addError(ValidationError{Message: fmt.Sprintf("expected vertex %s to be of type %s", id, strings.Join(labels, ", "))})
+	v.addError("expected vertex %s to be of type %s", id, strings.Join(labels, ", ")).Link(lineContext, parentLineContext)
 	return false
 }
 
-func (v *Validator) stashVertex(line string, id elements.ID) bool {
-	if _, ok := v.vertices[id]; ok {
-		v.addLineError(line, fmt.Sprintf("vertex %s already exists", id))
-		return false
-	}
-
-	if _, ok := v.edges[id]; ok {
-		v.addLineError(line, fmt.Sprintf("vertex and edges cannot share id %s", id))
-		return false
-	}
-
-	v.vertices[id] = line
-	return true
+func (v *Validator) stashVertex(lineContext LineContext) bool {
+	return v.stash(lineContext, v.vertices, v.edges, "vertex")
 }
 
-func (v *Validator) stashEdge(line string, id elements.ID) bool {
-	if _, ok := v.edges[id]; ok {
-		v.addLineError(line, fmt.Sprintf("edge %s already exists", id))
+func (v *Validator) stashEdge(lineContext LineContext) bool {
+	return v.stash(lineContext, v.edges, v.vertices, "edge")
+}
+
+func (v *Validator) stash(lineContext LineContext, m1, m2 map[elements.ID]LineContext, elementType string) bool {
+	if _, ok := m1[lineContext.Element.ID]; ok {
+		v.addError("%s %s already exists", elementType, lineContext.Element.ID).Link(lineContext, m1[lineContext.Element.ID])
 		return false
 	}
 
-	if _, ok := v.vertices[id]; ok {
-		v.addLineError(line, fmt.Sprintf("vertex and edges cannot share id %s", id))
+	if _, ok := m2[lineContext.Element.ID]; ok {
+		v.addError("vertex and edges cannot share id %s", lineContext.Element.ID).Link(lineContext, m2[lineContext.Element.ID])
 		return false
 	}
 
-	v.edges[id] = line
+	m1[lineContext.Element.ID] = lineContext
 	return true
 }

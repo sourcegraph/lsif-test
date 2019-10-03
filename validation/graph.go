@@ -1,7 +1,6 @@
 package validation
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/sourcegraph/lsif-test/elements"
@@ -10,30 +9,30 @@ import (
 var whitelist = []string{"metaData", "project"}
 
 func (v *Validator) ValidateGraph(stopOnError bool) bool {
+	// TODO - obey stopOnError for these functions a swell
 	processors := []func() bool{
-		v.ensureReachability,   // TODO - early out here as well
-		v.ensureRangeOwnership, // TODO - early out here as well
-		v.ensureDisjointRanges, // TODO - early out here as well
-		v.ensureItemContains,   // TODO - early out here as well
+		v.ensureReachability,
+		v.ensureRangeOwnership,
+		v.ensureDisjointRanges,
+		v.ensureItemContains,
 	}
 
-	allOk := true
+	valid := true
 	for _, f := range processors {
 		if !f() {
-			allOk = false
+			valid = false
 			if stopOnError {
 				return false
 			}
 		}
 	}
 
-	fmt.Printf("%d vertices, %d edges\n", len(v.vertices), len(v.edges))
-	return allOk
+	return valid
 }
 
 func (v *Validator) ensureReachability() bool {
 	visited := map[elements.ID]bool{}
-	ok := v.forEachContainsEdge(func(line string, edge *elements.Edge1n) bool {
+	v.forEachContainsEdge(func(lineContext LineContext, edge *elements.Edge1n) bool {
 		for _, inV := range append([]elements.ID{edge.OutV}, edge.InVs...) {
 			visited[inV] = true
 		}
@@ -41,16 +40,12 @@ func (v *Validator) ensureReachability() bool {
 		return true
 	})
 
-	if !ok {
-		return false
-	}
-
 	changed := true
 	for changed {
 		changed = false
 
-		for _, line := range v.edges {
-			edge, err := elements.ParseEdge(line)
+		for _, lineContext := range v.edges {
+			edge, err := elements.ParseEdge(lineContext.LineText)
 			if err != nil {
 				// all lines have already been parsed
 				panic("Unreachable!")
@@ -68,30 +63,23 @@ func (v *Validator) ensureReachability() bool {
 		}
 	}
 
-	allOk := true
+	valid := true
 
 outer:
-	for id, line := range v.vertices {
-		element, err := elements.ParseElement(line)
-		if err != nil {
-			// all lines have already been parsed
-			panic("Unreachable!")
-		}
-
+	for id, lineContext := range v.vertices {
 		for _, label := range whitelist {
-			if element.Label == label {
+			if lineContext.Element.Label == label {
 				continue outer
 			}
 		}
 
 		if _, ok := visited[id]; !ok {
-			allOk = false
-			// TODO - more context
-			v.addError(ValidationError{Message: fmt.Sprintf("unreachable vertex %s", id)})
+			valid = false
+			v.addError("vertex %s unreachable from any range", id).Link(v.vertices[id])
 		}
 	}
 
-	return allOk
+	return valid
 }
 
 func (v *Validator) ensureRangeOwnership() bool {
@@ -100,10 +88,9 @@ func (v *Validator) ensureRangeOwnership() bool {
 		return false
 	}
 
-	return v.forEachVertex("range", func(line string, element *elements.Element) bool {
-		if _, ok := ownedBy[element.ID]; !ok {
-			// TODO - more context
-			v.addError(ValidationError{Message: fmt.Sprintf("range %s not owned by any document", element.ID)})
+	return v.forEachVertex("range", func(lineContext LineContext) bool {
+		if _, ok := ownedBy[lineContext.Element.ID]; !ok {
+			v.addError("range %s not owned by any document", lineContext.Element.ID).Link(lineContext)
 			return false
 		}
 
@@ -117,11 +104,11 @@ func (v *Validator) ensureDisjointRanges() bool {
 		return false
 	}
 
-	allOk := true
+	valid := true
 	for documentID, rangeIDs := range invertOwnershipMap(ownershipMap) {
 		documentRanges := []*elements.DocumentRange{}
 		for _, rangeID := range rangeIDs {
-			documentRange, err := elements.ParseDocumentRange(v.vertices[rangeID])
+			documentRange, err := elements.ParseDocumentRange(v.vertices[rangeID].LineText)
 			if err != nil {
 				// all lines have already been parsed
 				panic("Unreachable!")
@@ -131,11 +118,11 @@ func (v *Validator) ensureDisjointRanges() bool {
 		}
 
 		if !v.ensureDisjoint(documentID, documentRanges) {
-			allOk = false
+			valid = false
 		}
 	}
 
-	return allOk
+	return valid
 }
 
 func (v *Validator) ensureDisjoint(documentID elements.ID, documentRanges []*elements.DocumentRange) bool {
@@ -145,20 +132,19 @@ func (v *Validator) ensureDisjoint(documentID elements.ID, documentRanges []*ele
 		return s1.Line < s2.Line || (s1.Line == s2.Line && s1.Character < s2.Character)
 	})
 
-	allOk := true
+	valid := true
 	for i := 1; i < len(documentRanges); i++ {
 		r1 := documentRanges[i-1]
 		r2 := documentRanges[i]
 
-		// TODO - can they share the same end point?
+		// TODO - can they touch?
 		if r1.End.Line > r2.Start.Line || (r1.End.Line == r2.Start.Line && r1.End.Character > r2.Start.Character) {
-			allOk = false
-			// TODO - more context
-			v.addError(ValidationError{Message: fmt.Sprintf("ranges %s and %s overlap in document %s\n", r1.ID, r2.ID, documentID)})
+			valid = false
+			v.addError("ranges overlap").Link(v.vertices[r1.ID], v.vertices[r2.ID])
 		}
 	}
 
-	return allOk
+	return valid
 }
 
 func (v *Validator) ensureItemContains() bool {
@@ -167,27 +153,25 @@ func (v *Validator) ensureItemContains() bool {
 		return false
 	}
 
-	return v.forEachEdge("item", func(line string, edge *elements.Edge1n) bool {
-		itemEdge, err := elements.ParseItemEdge(line)
+	return v.forEachEdge("item", func(lineContext LineContext, edge *elements.Edge1n) bool {
+		itemEdge, err := elements.ParseItemEdge(lineContext.LineText)
 		if err != nil {
 			// all lines have already been parsed
 			panic("Unreachable!")
 		}
 
+		valid := true
 		for _, inV := range edge.InVs {
-			if ownedBy[inV] != itemEdge.Document {
-				// TODO - more contexts
-				v.addError(ValidationError{Message: fmt.Sprintf(
-					"vertex %s not owned by document %s, as implied by item edge %s",
+			if ownedBy[inV].outV != itemEdge.Document {
+				valid = false
+				v.addError("vertex %s not owned by document %s, as implied by item edge %s",
 					inV,
 					itemEdge.Document,
 					edge.ID,
-				)})
-
-				return false
+				).Link(lineContext, ownedBy[inV].lineContext)
 			}
 		}
 
-		return true
+		return valid
 	})
 }

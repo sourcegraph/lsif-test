@@ -16,10 +16,11 @@ func (v *Validator) ValidateLine(line string) error {
 
 	v.lines++
 
-	// TODO - enable/disable via flag
-	// if err := v.validateSchema(line); err != nil {
-	// 	return err
-	// }
+	if !v.disableJSONSchema {
+		if err := v.validateSchema(line); err != nil {
+			return err
+		}
+	}
 
 	element, err := elements.ParseElement(line)
 	if err != nil {

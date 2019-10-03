@@ -23,6 +23,7 @@ func main() {
 func realMain() error {
 	app := kingpin.New("lsif-go", "lsif-validate is validator for LSIF indexer output.").Version(version)
 	dumpFile := app.Arg("dump-file", "The LSIf output to validate.").Default("data.lsif").File()
+	disableJSONSchema := app.Flag("disable-jsonschema", "Turn off JSON schema validation").Bool()
 
 	_, err := app.Parse(os.Args[1:])
 	if err != nil {
@@ -36,7 +37,7 @@ func realMain() error {
 		return fmt.Errorf("schema: %v", err)
 	}
 
-	validator := validation.NewValidator(schema)
+	validator := validation.NewValidator(schema, *disableJSONSchema)
 
 	scanner := bufio.NewScanner(*dumpFile)
 	for scanner.Scan() {

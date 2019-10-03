@@ -12,6 +12,7 @@ type ElementValidator func(line string, element *elements.Element) error
 
 type Validator struct {
 	schema            *gojsonschema.Schema
+	disableJSONSchema bool
 	elementValidators map[string]ElementValidator
 	vertexValidators  map[string]LineValidator
 	edgeValidators    map[string]LineValidator
@@ -23,11 +24,12 @@ type Validator struct {
 	ownershipMap      map[elements.ID]elements.ID
 }
 
-func NewValidator(schema *gojsonschema.Schema) *Validator {
+func NewValidator(schema *gojsonschema.Schema, disableJSONSchema bool) *Validator {
 	validator := &Validator{
-		schema:   schema,
-		vertices: map[elements.ID]string{},
-		edges:    map[elements.ID]string{},
+		schema:            schema,
+		disableJSONSchema: disableJSONSchema,
+		vertices:          map[elements.ID]string{},
+		edges:             map[elements.ID]string{},
 	}
 
 	validator.elementValidators = validator.setupElementValidators()

@@ -1,8 +1,10 @@
-package main
+package validation
 
 import (
 	"fmt"
 	"sort"
+
+	"github.com/sourcegraph/lsif-test/elements"
 )
 
 var whitelist = []string{"metaData", "project"}
@@ -26,10 +28,10 @@ func (v *Validator) ValidateGraph() error {
 }
 
 func (v *Validator) ensureReachability() error {
-	visited := map[id]bool{}
+	visited := map[elements.ID]bool{}
 
-	err := v.forEachContainsEdge(func(line string, edge *edge1n) error {
-		for _, inV := range append([]id{edge.OutV}, edge.InVs...) {
+	err := v.forEachContainsEdge(func(line string, edge *elements.Edge1n) error {
+		for _, inV := range append([]elements.ID{edge.OutV}, edge.InVs...) {
 			visited[inV] = true
 		}
 
@@ -45,7 +47,7 @@ func (v *Validator) ensureReachability() error {
 		changed = false
 
 		for _, line := range v.edges {
-			edge, err := parseEdge(line)
+			edge, err := elements.ParseEdge(line)
 			if err != nil {
 				return err
 			}
@@ -64,7 +66,7 @@ func (v *Validator) ensureReachability() error {
 
 outer:
 	for id, line := range v.vertices {
-		element, err := parseElement(line)
+		element, err := elements.ParseElement(line)
 		if err != nil {
 			return err
 		}
@@ -89,7 +91,7 @@ func (v *Validator) ensureRangeOwnership() error {
 		return err
 	}
 
-	return v.forEachVertex("range", func(line string, element *Element) error {
+	return v.forEachVertex("range", func(line string, element *elements.Element) error {
 		if _, ok := ownedBy[element.ID]; !ok {
 			return fmt.Errorf("range %s not owned by any document", element.ID)
 		}
@@ -105,9 +107,9 @@ func (v *Validator) ensureDisjointRanges() error {
 	}
 
 	for documentID, rangeIDs := range invertOwnershipMap(ownershipMap) {
-		documentRanges := []*documentRange{}
+		documentRanges := []*elements.DocumentRange{}
 		for _, rangeID := range rangeIDs {
-			documentRange, err := parseDocumentRange(v.vertices[rangeID])
+			documentRange, err := elements.ParseDocumentRange(v.vertices[rangeID])
 			if err != nil {
 				return err
 			}
@@ -123,7 +125,7 @@ func (v *Validator) ensureDisjointRanges() error {
 	return nil
 }
 
-func (v *Validator) ensureDisjoint(documentID id, documentRanges []*documentRange) error {
+func (v *Validator) ensureDisjoint(documentID elements.ID, documentRanges []*elements.DocumentRange) error {
 	sort.Slice(documentRanges, func(i, j int) bool {
 		s1 := documentRanges[i].Start
 		s2 := documentRanges[j].Start
@@ -151,8 +153,8 @@ func (v *Validator) ensureItemContains() error {
 		return err
 	}
 
-	return v.forEachEdge("item", func(line string, edge *edge1n) error {
-		itemEdge, err := parseItemEdge(line)
+	return v.forEachEdge("item", func(line string, edge *elements.Edge1n) error {
+		itemEdge, err := elements.ParseItemEdge(line)
 		if err != nil {
 			return err
 		}

@@ -1,57 +1,57 @@
-package main
+package elements
 
 import "encoding/json"
 
 // TODO - allow to be number as well
-type id string
+type ID string
 
 type Element struct {
-	ID    id     `json:"id"`
+	ID    ID     `json:"id"`
 	Type  string `json:"type"`
 	Label string `json:"label"`
 }
 
-type metaData struct {
+type MetaData struct {
 	*Element
 	ProjectRoot string `json:"projectRoot"`
 }
 
-type document struct {
+type Document struct {
 	*Element
 	URI string `json:"uri"`
 }
 
-type documentRange struct {
+type DocumentRange struct {
 	*Element
-	Start position `json:"start"`
-	End   position `json:"end"`
+	Start Position `json:"start"`
+	End   Position `json:"end"`
 }
 
-type position struct {
+type Position struct {
 	Line      int `json:"line"`
 	Character int `json:"character"`
 }
 
-type edge11 struct {
+type Edge11 struct {
 	*Element
-	OutV id `json:"outV"`
-	InV  id `json:"inV"`
+	OutV ID `json:"outV"`
+	InV  ID `json:"inV"`
 }
 
-type edge1n struct {
+type Edge1n struct {
 	*Element
-	OutV id   `json:"outV"`
-	InVs []id `json:"inVs"`
+	OutV ID   `json:"outV"`
+	InVs []ID `json:"inVs"`
 }
 
-type itemEdge struct {
+type ItemEdge struct {
 	*Element
-	OutV     id   `json:"outV"`
-	InVs     []id `json:"inVs"`
-	Document id   `json:"document"`
+	OutV     ID   `json:"outV"`
+	InVs     []ID `json:"inVs"`
+	Document ID   `json:"document"`
 }
 
-func parseElement(line string) (*Element, error) {
+func ParseElement(line string) (*Element, error) {
 	element := &Element{}
 	if err := json.Unmarshal([]byte(line), &element); err != nil {
 		return nil, err
@@ -60,8 +60,8 @@ func parseElement(line string) (*Element, error) {
 	return element, nil
 }
 
-func parseMetaData(line string) (*metaData, error) {
-	metaData := &metaData{}
+func ParseMetaData(line string) (*MetaData, error) {
+	metaData := &MetaData{}
 	if err := json.Unmarshal([]byte(line), &metaData); err != nil {
 		return nil, err
 	}
@@ -69,8 +69,8 @@ func parseMetaData(line string) (*metaData, error) {
 	return metaData, nil
 }
 
-func parseDocument(line string) (*document, error) {
-	document := &document{}
+func ParseDocument(line string) (*Document, error) {
+	document := &Document{}
 	if err := json.Unmarshal([]byte(line), &document); err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func parseDocument(line string) (*document, error) {
 	return document, nil
 }
 
-func parseDocumentRange(line string) (*documentRange, error) {
-	documentRange := &documentRange{}
+func ParseDocumentRange(line string) (*DocumentRange, error) {
+	documentRange := &DocumentRange{}
 	if err := json.Unmarshal([]byte(line), &documentRange); err != nil {
 		return nil, err
 	}
@@ -87,8 +87,8 @@ func parseDocumentRange(line string) (*documentRange, error) {
 	return documentRange, nil
 }
 
-func parseEdge11(line string) (*edge11, error) {
-	edge := &edge11{}
+func ParseEdge11(line string) (*Edge11, error) {
+	edge := &Edge11{}
 	if err := json.Unmarshal([]byte(line), &edge); err != nil {
 		return nil, err
 	}
@@ -96,8 +96,8 @@ func parseEdge11(line string) (*edge11, error) {
 	return edge, nil
 }
 
-func parseEdge1n(line string) (*edge1n, error) {
-	edge := &edge1n{}
+func ParseEdge1n(line string) (*Edge1n, error) {
+	edge := &Edge1n{}
 	if err := json.Unmarshal([]byte(line), &edge); err != nil {
 		return nil, err
 	}
@@ -105,8 +105,8 @@ func parseEdge1n(line string) (*edge1n, error) {
 	return edge, nil
 }
 
-func parseItemEdge(line string) (*itemEdge, error) {
-	edge := &itemEdge{}
+func ParseItemEdge(line string) (*ItemEdge, error) {
+	edge := &ItemEdge{}
 	if err := json.Unmarshal([]byte(line), &edge); err != nil {
 		return nil, err
 	}
@@ -114,14 +114,14 @@ func parseItemEdge(line string) (*itemEdge, error) {
 	return edge, nil
 }
 
-func parseEdge(line string) (*edge1n, error) {
-	edge1n := &edge1n{}
+func ParseEdge(line string) (*Edge1n, error) {
+	edge1n := &Edge1n{}
 	if err := json.Unmarshal([]byte(line), &edge1n); err != nil {
 		return nil, err
 	}
 
 	if len(edge1n.InVs) == 0 {
-		edge11 := &edge11{}
+		edge11 := &Edge11{}
 		if err := json.Unmarshal([]byte(line), &edge11); err != nil {
 			return nil, err
 		}

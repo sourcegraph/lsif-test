@@ -1,10 +1,11 @@
-package main
+package validation
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/sourcegraph/lsif-test/elements"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -20,7 +21,7 @@ func (v *Validator) ValidateLine(line string) error {
 	// 	return err
 	// }
 
-	element, err := parseElement(line)
+	element, err := elements.ParseElement(line)
 	if err != nil {
 		return err
 	}
@@ -35,14 +36,14 @@ func (v *Validator) ValidateLine(line string) error {
 //
 // Element Validators
 
-func (v *Validator) setupElementValidators() map[string]elementValidator {
-	return map[string]elementValidator{
+func (v *Validator) setupElementValidators() map[string]ElementValidator {
+	return map[string]ElementValidator{
 		"vertex": v.validateVertex,
 		"edge":   v.validateEdge,
 	}
 }
 
-func (v *Validator) validateVertex(line string, element *Element) error {
+func (v *Validator) validateVertex(line string, element *elements.Element) error {
 	if err := v.validate(v.vertexValidators, element.Label, line); err != nil {
 		return err
 	}
@@ -54,7 +55,7 @@ func (v *Validator) validateVertex(line string, element *Element) error {
 	return nil
 }
 
-func (v *Validator) validateEdge(line string, element *Element) error {
+func (v *Validator) validateEdge(line string, element *elements.Element) error {
 	if err := v.validate(v.edgeValidators, element.Label, line); err != nil {
 		return err
 	}
@@ -69,8 +70,8 @@ func (v *Validator) validateEdge(line string, element *Element) error {
 //
 // Vertex Validators
 
-func (v *Validator) setupVertexValidators() map[string]lineValidator {
-	return map[string]lineValidator{
+func (v *Validator) setupVertexValidators() map[string]LineValidator {
+	return map[string]LineValidator{
 		"metaData": v.validateMetaDataVertex,
 		"document": v.validateDocumentVertex,
 		"range":    v.validateRangeVertex,
@@ -78,7 +79,11 @@ func (v *Validator) setupVertexValidators() map[string]lineValidator {
 }
 
 func (v *Validator) validateMetaDataVertex(line string) error {
-	metaData, err := parseMetaData(line)
+	if v.hasMetadata {
+		return fmt.Errorf("metadata vertex defined multiple times")
+	}
+
+	metaData, err := elements.ParseMetaData(line)
 	if err != nil {
 		return err
 	}
@@ -94,7 +99,7 @@ func (v *Validator) validateMetaDataVertex(line string) error {
 }
 
 func (v *Validator) validateDocumentVertex(line string) error {
-	document, err := parseDocument(line)
+	document, err := elements.ParseDocument(line)
 	if err != nil {
 		return err
 	}
@@ -112,7 +117,7 @@ func (v *Validator) validateDocumentVertex(line string) error {
 }
 
 func (v *Validator) validateRangeVertex(line string) error {
-	documentRange, err := parseDocumentRange(line)
+	documentRange, err := elements.ParseDocumentRange(line)
 	if err != nil {
 		return err
 	}
@@ -146,8 +151,8 @@ func (v *Validator) validateRangeVertex(line string) error {
 //
 // Edge Validators
 
-func (v *Validator) setupEdgeValidators() map[string]lineValidator {
-	return map[string]lineValidator{
+func (v *Validator) setupEdgeValidators() map[string]LineValidator {
+	return map[string]LineValidator{
 		"contains":                v.validateContainsEdge,
 		"item":                    v.validateItemEdge,
 		"next":                    v.validateEdge11([]string{"range", "resultSet"}, "resultSet"),
@@ -161,7 +166,7 @@ func (v *Validator) setupEdgeValidators() map[string]lineValidator {
 }
 
 func (v *Validator) validateContainsEdge(line string) error {
-	edge, err := parseEdge1n(line)
+	edge, err := elements.ParseEdge1n(line)
 	if err != nil {
 		return err
 	}
@@ -183,7 +188,7 @@ func (v *Validator) validateContainsEdge(line string) error {
 }
 
 func (v *Validator) validateItemEdge(line string) error {
-	edge, err := parseItemEdge(line)
+	edge, err := elements.ParseItemEdge(line)
 	if err != nil {
 		return err
 	}
@@ -211,9 +216,9 @@ func (v *Validator) validateItemEdge(line string) error {
 	return nil
 }
 
-func (v *Validator) validateEdge11(sources []string, result string) lineValidator {
+func (v *Validator) validateEdge11(sources []string, result string) LineValidator {
 	return func(line string) error {
-		edge, err := parseEdge11(line)
+		edge, err := elements.ParseEdge11(line)
 		if err != nil {
 			return err
 		}
@@ -233,7 +238,7 @@ func (v *Validator) validateEdge11(sources []string, result string) lineValidato
 //
 // Helpers
 
-func (v *Validator) validate(validators map[string]lineValidator, label string, line string) error {
+func (v *Validator) validate(validators map[string]LineValidator, label string, line string) error {
 	if f, ok := validators[label]; ok {
 		return f(line)
 	}
@@ -254,16 +259,16 @@ func (v *Validator) validateSchema(line string) error {
 	return nil
 }
 
-func (v *Validator) vertexElement(id id) (*Element, error) {
+func (v *Validator) vertexElement(id elements.ID) (*elements.Element, error) {
 	line, ok := v.vertices[id]
 	if !ok {
 		return nil, fmt.Errorf("no such vertex %s", id)
 	}
 
-	return parseElement(line)
+	return elements.ParseElement(line)
 }
 
-func (v *Validator) ensureVertexType(id id, labels []string) error {
+func (v *Validator) ensureVertexType(id elements.ID, labels []string) error {
 	element, err := v.vertexElement(id)
 	if err != nil {
 		return err
@@ -286,7 +291,7 @@ func (v *Validator) ensureMetadata() error {
 	return nil
 }
 
-func (v *Validator) stashVertex(line string, id id) error {
+func (v *Validator) stashVertex(line string, id elements.ID) error {
 	if _, ok := v.vertices[id]; ok {
 		return fmt.Errorf("vertex %s already exists", id)
 	}
@@ -299,7 +304,7 @@ func (v *Validator) stashVertex(line string, id id) error {
 	return nil
 }
 
-func (v *Validator) stashEdge(line string, id id) error {
+func (v *Validator) stashEdge(line string, id elements.ID) error {
 	if _, ok := v.edges[id]; ok {
 		return fmt.Errorf("edge %s already exists", id)
 	}

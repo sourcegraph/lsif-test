@@ -43,7 +43,7 @@ func (v *Validator) ValidateLine(line string) bool {
 		LineIndex: v.lines,
 	}
 
-	return !v.elementValidators[element.Type](lineContext) && valid
+	return v.elementValidators[element.Type](lineContext) && valid
 }
 
 //

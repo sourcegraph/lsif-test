@@ -123,10 +123,10 @@ func realMain() error {
 
 	if hasErrors {
 		fmt.Printf("\n")
-	} else {
-		fmt.Printf(":)\n")
+		os.Exit(1)
 	}
 
+	fmt.Printf(":)\n")
 	return nil
 }
 

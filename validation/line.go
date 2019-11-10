@@ -92,7 +92,7 @@ func (v *Validator) validateMetaDataVertex(lineContext LineContext) bool {
 	}
 
 	url, err := url.Parse(metaData.ProjectRoot)
-	if err != nil {
+	if err != nil || url.Scheme == "" {
 		v.addError("project root is not a valid URL").Link(lineContext)
 		return false
 	}
@@ -110,7 +110,7 @@ func (v *Validator) validateDocumentVertex(lineContext LineContext) bool {
 	}
 
 	url, err := url.Parse(document.URI)
-	if err != nil {
+	if err != nil || url.Scheme == "" {
 		v.addError("document uri is not a valid URL").Link(lineContext)
 		return false
 	}

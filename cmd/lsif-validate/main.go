@@ -23,7 +23,7 @@ func main() {
 }
 
 func realMain() error {
-	app := kingpin.New("lsif-go", "lsif-validate is validator for LSIF indexer output.").Version(version)
+	app := kingpin.New("lsif-validate", "lsif-validate is validator for LSIF indexer output.").Version(version)
 	dumpFile := app.Arg("dump-file", "The LSIf output to validate.").Default("data.lsif").File()
 	disableJSONSchema := app.Flag("disable-jsonschema", "Turn off JSON schema validation").Bool()
 	stopOnError := app.Flag("stop-on-error", "Stop validation after the first error.").Bool()

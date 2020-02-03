@@ -80,7 +80,7 @@ func realMain() error {
 		if ranges, ok := rangesByLine[rangesByID[rangeID].Start.Line]; !ok {
 			rangesByLine[rangesByID[rangeID].Start.Line] = []elements.DocumentRange{rangesByID[rangeID]}
 		} else {
-			ranges = append(ranges, rangesByID[rangeID])
+			rangesByLine[rangesByID[rangeID].Start.Line] = append(ranges, rangesByID[rangeID])
 		}
 	}
 

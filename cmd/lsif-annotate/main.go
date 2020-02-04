@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/alecthomas/kingpin"
@@ -84,14 +85,6 @@ func realMain() error {
 		}
 	}
 
-	type Piece struct {
-		text   string
-		rainge *elements.DocumentRange
-	}
-	slice := func(line string, ranges []elements.DocumentRange) []Piece {
-		return []Piece{Piece{text: line, rainge: nil}}
-	}
-
 	filepath := strings.TrimPrefix(*docURIToAnnotate, "file://")
 	bytes, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -99,21 +92,18 @@ func realMain() error {
 	}
 	content := string(bytes)
 	for linenumber, line := range strings.Split(content, "\n") {
-		for _, piece := range slice(line, rangesByLine[linenumber]) {
-			if piece.rainge == nil {
-				fmt.Printf(piece.text)
-			} else {
-				fmt.Printf("**" + piece.text + "**")
-			}
-		}
-		fmt.Printf("\n")
-		for _, rainge := range rangesByLine[linenumber] {
-			fmt.Printf(strings.Repeat(" ", rainge.Start.Character))
-			color.Set(color.FgGreen)
-			fmt.Printf(strings.Repeat("^", rainge.End.Character-rainge.Start.Character))
-			fmt.Printf(" range %s", rainge.ID.Value)
-			color.Unset()
-			fmt.Println("")
+		fmt.Println(line)
+
+		ranges := rangesByLine[linenumber]
+		sort.SliceStable(ranges, func(i, j int) bool {
+			return ranges[i].Start.Character < ranges[j].Start.Character
+		})
+
+		for _, rainge := range ranges {
+			whitespace := strings.Repeat(" ", rainge.Start.Character)
+			indicator := strings.Repeat("^", rainge.End.Character-rainge.Start.Character)
+			label := fmt.Sprintf("range %s", rainge.ID.Value)
+			color.Green(whitespace + indicator + " " + label)
 		}
 	}
 

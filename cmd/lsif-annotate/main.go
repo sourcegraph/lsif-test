@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,7 +13,7 @@ import (
 
 	"github.com/alecthomas/kingpin"
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
+	_ "github.com/lib/pq"
 	"github.com/sourcegraph/lsif-test/elements"
 )
 
@@ -37,52 +39,31 @@ func realMain() error {
 
 	defer (*dumpFile).Close()
 
-	scanner := bufio.NewScanner(*dumpFile)
-	scanner.Buffer(make([]byte, *bufferCapacity), *bufferCapacity)
-
-	rangeIDsByDocID := make(map[elements.ID][]elements.ID)
-	rangesByID := make(map[elements.ID]elements.DocumentRange)
-	docsByURI := make(map[string]elements.Document)
-
-	for scanner.Scan() {
-		element, err := elements.ParseElement(scanner.Text())
-		if err != nil {
-			return errors.Wrap(err, "failed to parse element")
-		}
-		switch element.Label {
-		case "range":
-			rainge, err := elements.ParseDocumentRange(scanner.Text())
-			if err != nil {
-				return errors.Wrap(err, "failed to parse range")
-			}
-			rangesByID[rainge.ID] = *rainge
-		case "document":
-			doc, err := elements.ParseDocument(scanner.Text())
-			if err != nil {
-				return errors.Wrap(err, "failed to parse document")
-			}
-			docsByURI[doc.URI] = *doc
-		case "contains":
-			contains, err := elements.ParseEdge(scanner.Text())
-			if err != nil {
-				return errors.Wrap(err, "failed to parse document")
-			}
-			rangeIDsByDocID[contains.OutV] = contains.InVs
-		}
+	db, err := loadDump(*dumpFile, *bufferCapacity)
+	if err != nil {
+		return err
 	}
 
-	docToAnnotate, ok := docsByURI[*docURIToAnnotate]
-	if !ok {
-		return fmt.Errorf("document %s not found", *docURIToAnnotate)
+	results, err := queryAllRaw(db, `
+SELECT ranges.data FROM lsif_annotate doc
+JOIN lsif_annotate contains ON
+	contains.data->>'outV' = doc.data->>'id'
+JOIN lsif_annotate ranges ON
+	contains.data->'inVs' ? (ranges.data->>'id'::TEXT)
+WHERE doc.data->>'uri' = $1
+ORDER BY ranges.data->'start'->'line';
+`, *docURIToAnnotate)
+	if err != nil {
+		return err
 	}
-
 	rangesByLine := make(map[int][]elements.DocumentRange)
-	docToAnnotateRangeIDs := rangeIDsByDocID[docToAnnotate.ID]
-	for _, rangeID := range docToAnnotateRangeIDs {
-		if ranges, ok := rangesByLine[rangesByID[rangeID].Start.Line]; !ok {
-			rangesByLine[rangesByID[rangeID].Start.Line] = []elements.DocumentRange{rangesByID[rangeID]}
+	for _, v := range results {
+		var ranje elements.DocumentRange
+		json.Unmarshal(v, &ranje)
+		if ranges, ok := rangesByLine[ranje.Start.Line]; ok {
+			rangesByLine[ranje.Start.Line] = append(ranges, ranje)
 		} else {
-			rangesByLine[rangesByID[rangeID].Start.Line] = append(ranges, rangesByID[rangeID])
+			rangesByLine[ranje.Start.Line] = []elements.DocumentRange{ranje}
 		}
 	}
 
@@ -112,8 +93,61 @@ func realMain() error {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner: %v", err)
-	}
 	return nil
+}
+
+func queryAllRaw(db *sql.DB, query string, args ...interface{}) ([][]byte, error) {
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([][]byte, 0)
+	for rows.Next() {
+		var result []byte
+		err := rows.Scan(&result)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, rows.Err()
+}
+
+func queryAll(db *sql.DB, query string, args ...interface{}) ([]map[string]interface{}, error) {
+	rawResults, err := queryAllRaw(db, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]map[string]interface{}, 0)
+	for _, rawResult := range rawResults {
+		var result map[string]interface{}
+		err = json.Unmarshal(rawResult, &result)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
+func loadDump(dumpFile *os.File, bufferCapacity int) (*sql.DB, error) {
+	db, err := sql.Open("postgres", "")
+	if err != nil {
+		return nil, err
+	}
+
+	scanner := bufio.NewScanner(dumpFile)
+	scanner.Buffer(make([]byte, bufferCapacity), bufferCapacity)
+
+	db.Exec("DROP TABLE IF EXISTS lsif_annotate;")
+	db.Exec("CREATE TABLE lsif_annotate (data jsonb);")
+
+	for scanner.Scan() {
+		_, err := db.Exec("INSERT INTO lsif_annotate VALUES ($1);", scanner.Text())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return db, nil
 }

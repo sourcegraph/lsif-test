@@ -9,6 +9,7 @@ require (
 	github.com/efritz/pentimento v0.0.0-20190429011147-ade47d831101
 	github.com/fatih/color v1.9.0
 	github.com/kevinburke/go-bindata v3.14.0+incompatible // indirect
+	github.com/lib/pq v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect

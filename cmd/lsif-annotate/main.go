@@ -67,6 +67,44 @@ ORDER BY ranges.data->'start'->'line';
 		}
 	}
 
+	results, err = queryAllRaw(db, `
+SELECT ranges.data FROM lsif_annotate defs
+JOIN lsif_annotate items ON
+	defs.data->>'id' = items.data->>'outV'
+JOIN lsif_annotate ranges ON
+	items.data->'inVs' ? (ranges.data->>'id'::TEXT)
+WHERE defs.data->>'label' = 'definitionResult'
+ORDER BY ranges.data->'start'->'line';
+`)
+	if err != nil {
+		return err
+	}
+	defRangeIDs := make(map[elements.ID]interface{}, 0)
+	for _, v := range results {
+		var ranje elements.DocumentRange
+		json.Unmarshal(v, &ranje)
+		defRangeIDs[ranje.ID] = nil
+	}
+
+	results, err = queryAllRaw(db, `
+SELECT ranges.data FROM lsif_annotate refs
+JOIN lsif_annotate items ON
+	refs.data->>'id' = items.data->>'outV'
+JOIN lsif_annotate ranges ON
+	items.data->'inVs' ? (ranges.data->>'id'::TEXT)
+WHERE refs.data->>'label' = 'referenceResult'
+ORDER BY ranges.data->'start'->'line';
+`)
+	if err != nil {
+		return err
+	}
+	refRangeIDs := make(map[elements.ID]interface{}, 0)
+	for _, v := range results {
+		var ranje elements.DocumentRange
+		json.Unmarshal(v, &ranje)
+		refRangeIDs[ranje.ID] = nil
+	}
+
 	filepath := strings.TrimPrefix(*docURIToAnnotate, "file://")
 	bytes, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -75,21 +113,27 @@ ORDER BY ranges.data->'start'->'line';
 	content := string(bytes)
 	lines := strings.Split(content, "\n")
 	for linenumber, line := range lines {
-		yellow := color.New(color.FgYellow).SprintFunc()
 		padding := strconv.Itoa(len(strconv.Itoa(len(lines))))
 		linePrefix := fmt.Sprintf("Line %-"+padding+"d|", linenumber)
-		fmt.Println(yellow(linePrefix) + line)
+		fmt.Println(color.New(color.FgYellow).Sprint(linePrefix) + color.New(color.FgBlack).Sprint(line))
 
 		ranges := rangesByLine[linenumber]
 		sort.SliceStable(ranges, func(i, j int) bool {
-			return ranges[i].Start.Character < ranges[j].Start.Character
+			return ranges[i].Start.Character > ranges[j].Start.Character
 		})
 
 		for _, rainge := range ranges {
 			whitespace := strings.Repeat(" ", len(linePrefix)+rainge.Start.Character)
-			indicator := strings.Repeat("^", rainge.End.Character-rainge.Start.Character)
-			label := fmt.Sprintf("range id %s character %d", rainge.ID.Value, rainge.Start.Character)
-			color.Green(whitespace + indicator + " " + label)
+			indicator := color.New(color.FgGreen).Sprint(strings.Repeat("^", rainge.End.Character-rainge.Start.Character))
+			label := ""
+			label += color.New(color.FgBlue).Sprintf("range id %s character %d", rainge.ID.Value, rainge.Start.Character)
+			if _, ok := defRangeIDs[rainge.ID]; ok {
+				label += " " + color.New(color.FgHiRed).Sprint("def")
+			}
+			if _, ok := refRangeIDs[rainge.ID]; ok {
+				label += " " + color.New(color.FgHiMagenta).Sprint("ref")
+			}
+			fmt.Println(whitespace + indicator + " " + label)
 		}
 	}
 

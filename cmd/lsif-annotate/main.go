@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/alecthomas/kingpin"
@@ -91,8 +92,12 @@ func realMain() error {
 		return err
 	}
 	content := string(bytes)
-	for linenumber, line := range strings.Split(content, "\n") {
-		fmt.Println(line)
+	lines := strings.Split(content, "\n")
+	for linenumber, line := range lines {
+		yellow := color.New(color.FgYellow).SprintFunc()
+		padding := strconv.Itoa(len(strconv.Itoa(len(lines))))
+		linePrefix := fmt.Sprintf("Line %-"+padding+"d|", linenumber)
+		fmt.Println(yellow(linePrefix) + line)
 
 		ranges := rangesByLine[linenumber]
 		sort.SliceStable(ranges, func(i, j int) bool {
@@ -100,9 +105,9 @@ func realMain() error {
 		})
 
 		for _, rainge := range ranges {
-			whitespace := strings.Repeat(" ", rainge.Start.Character)
+			whitespace := strings.Repeat(" ", len(linePrefix)+rainge.Start.Character)
 			indicator := strings.Repeat("^", rainge.End.Character-rainge.Start.Character)
-			label := fmt.Sprintf("range %s", rainge.ID.Value)
+			label := fmt.Sprintf("range id %s character %d", rainge.ID.Value, rainge.Start.Character)
 			color.Green(whitespace + indicator + " " + label)
 		}
 	}

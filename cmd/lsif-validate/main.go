@@ -101,12 +101,14 @@ func realMain() error {
 		return fmt.Errorf("scanner: %v", err)
 	}
 
+	completedValidation := false
 	if valid {
 		withProgressUpdate("processing relationships", func() {
 			if !validator.ValidateGraph(*stopOnError) {
 				valid = false
 			}
 		})
+		completedValidation = true
 	}
 
 	fmt.Printf("%s done.\n", header)
@@ -119,6 +121,11 @@ func realMain() error {
 		for _, lineContext := range err.RelevantLines {
 			fmt.Printf("\ton line #%d: %s\n", lineContext.LineIndex, lineContext.LineText)
 		}
+	}
+
+	if !completedValidation {
+		fmt.Printf("\n")
+		fmt.Println("WARNING Partial validation! Fix errors and re-run to continue validation.")
 	}
 
 	if hasErrors {

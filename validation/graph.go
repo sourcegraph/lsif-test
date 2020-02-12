@@ -9,7 +9,7 @@ import (
 var reachabilityIgnoreList = []string{"metaData", "project", "document", "$event"}
 
 func (v *Validator) ValidateGraph(stopOnError bool) bool {
-	// TODO - obey stopOnError for these functions a swell
+	// TODO - obey stopOnError for these functions as well
 	processors := []func() bool{
 		v.ensureReachability,
 		v.ensureRangeOwnership,

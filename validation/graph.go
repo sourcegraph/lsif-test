@@ -6,7 +6,7 @@ import (
 	"github.com/sourcegraph/lsif-test/elements"
 )
 
-var reachabilityIgnoreList = []string{"metaData", "project", "$event"}
+var reachabilityIgnoreList = []string{"metaData", "project", "document", "$event"}
 
 func (v *Validator) ValidateGraph(stopOnError bool) bool {
 	// TODO - obey stopOnError for these functions a swell

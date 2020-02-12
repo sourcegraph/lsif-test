@@ -28,7 +28,7 @@ func main() {
 
 func realMain() error {
 	app := kingpin.New("lsif-annotate", "lsif-annotate is an annotator for debugging LSIF indexer output.").Version(version)
-	dumpFile := app.Arg("dump-file", "The LSIf output to validate.").Default("data.lsif").File()
+	dumpFile := app.Arg("dump-file", "The LSIF output to validate.").Default("dump.lsif").File()
 	bufferCapacity := app.Flag("buffer-capacity", "Set the max line size.").Default("1000000").Int()
 	docURIToAnnotate := app.Flag("docURI", "The document URI to annotate.").Required().String()
 

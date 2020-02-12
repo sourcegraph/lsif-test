@@ -24,7 +24,7 @@ func main() {
 
 func realMain() error {
 	app := kingpin.New("lsif-validate", "lsif-validate is validator for LSIF indexer output.").Version(version)
-	dumpFile := app.Arg("dump-file", "The LSIf output to validate.").Default("data.lsif").File()
+	dumpFile := app.Arg("dump-file", "The LSIF output to validate.").Default("dump.lsif").File()
 	disableJSONSchema := app.Flag("disable-jsonschema", "Turn off JSON schema validation").Bool()
 	stopOnError := app.Flag("stop-on-error", "Stop validation after the first error.").Bool()
 	bufferCapacity := app.Flag("buffer-capacity", "Set the max line size.").Default("1000000").Int()

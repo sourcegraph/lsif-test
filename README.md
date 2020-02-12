@@ -11,7 +11,7 @@ This repository host Go binaries that test the output of an [LSIF](https://githu
 1. Download and build this program via `go get github.com/sourcegraph/lsif-test/cmd/lsif-validate`.
 2. The binary `lsif-validate` should be installed into your `$GOPATH/bin` directory.
 3. Make sure you have added `$GOPATH/bin` to your `$PATH` environment variable.
-4. Run `lsif-validate ./path/to/data.lsif` to see if there are errors.
+4. Run `lsif-validate ./path/to/dump.lsif` to see if there are errors.
 
 The validator is a beefier version of `lsif-util validate` and checks the following properties:
 

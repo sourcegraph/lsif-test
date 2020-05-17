@@ -11,6 +11,7 @@ var reachabilityIgnoreList = []string{"metaData", "project", "document", "$event
 func (v *Validator) ValidateGraph(stopOnError bool) bool {
 	// TODO - obey stopOnError for these functions as well
 	processors := []func() bool{
+		v.ensureUniqueDocuments,
 		v.ensureReachability,
 		v.ensureRangeOwnership,
 		v.ensureDisjointRanges,
@@ -28,6 +29,25 @@ func (v *Validator) ValidateGraph(stopOnError bool) bool {
 	}
 
 	return valid
+}
+
+func (v *Validator) ensureUniqueDocuments() bool {
+	uris := map[string]struct{}{}
+	return v.forEachVertex("document", func(lineContext LineContext) bool {
+		document, err := elements.ParseDocument(lineContext.LineText)
+		if err != nil {
+			// all lines have already been parsed
+			panic("Unreachable!")
+		}
+
+		if _, ok := uris[document.URI]; ok {
+			v.addError("document %s defines an already-defined document", lineContext.Element.ID).Link(lineContext)
+			return false
+		}
+
+		uris[document.URI] = struct{}{}
+		return true
+	})
 }
 
 func (v *Validator) ensureReachability() bool {

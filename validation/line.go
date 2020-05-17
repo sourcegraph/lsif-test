@@ -115,11 +115,6 @@ func (v *Validator) validateDocumentVertex(lineContext LineContext) bool {
 		return false
 	}
 
-	if v.projectRoot != nil && !strings.HasPrefix(url.String(), v.projectRoot.String()) {
-		v.addError("document is not relative to project root").Link(lineContext)
-		return false
-	}
-
 	return true
 }
 

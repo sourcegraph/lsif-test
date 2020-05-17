@@ -3577,6 +3577,11 @@
               "description": "The URL to the repository",
               "title": "url",
               "type": "string"
+            },
+            "directory": {
+              "description": "The directory within the repository",
+              "title": "url",
+              "type": "string"
             }
           },
           "required": ["type", "url"],

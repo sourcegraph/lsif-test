@@ -20,7 +20,6 @@ The validator is a beefier version of `lsif-util validate` and checks the follow
 - All references of element occur after its definition
 - A single metadata vertex exists and is the firsts element in the dump
 - The project root is a valid URL
-- Each document URI is a URL relative to the project root
 - Each range vertex has sane bounds (non-negative line/character values and the ending position occurs strictly after the starting position)
 - 1-to-n edges have a non-empty `inVs` array
 - Edges refer to identifiers attached to the correct element type, as follows:

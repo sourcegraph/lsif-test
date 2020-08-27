@@ -20,6 +20,7 @@ type Validator struct {
 	projectRoot       *url.URL
 	lines             int
 	ownershipMap      map[elements.ID]ownershipContext
+	allowNestedRanges bool
 }
 
 type LineContext struct {
@@ -30,10 +31,11 @@ type LineContext struct {
 
 type ValidatorFunc func(lineContext LineContext) bool
 
-func NewValidator(schema *gojsonschema.Schema, disableJSONSchema bool) *Validator {
+func NewValidator(schema *gojsonschema.Schema, disableJSONSchema, allowNestedRanges bool) *Validator {
 	validator := &Validator{
 		schema:            schema,
 		disableJSONSchema: disableJSONSchema,
+		allowNestedRanges: allowNestedRanges,
 		vertices:          map[elements.ID]LineContext{},
 		edges:             map[elements.ID]LineContext{},
 	}

@@ -137,6 +137,12 @@ func (v *Validator) ensureDisjoint(documentID elements.ID, documentRanges []*ele
 		r1 := documentRanges[i-1]
 		r2 := documentRanges[i]
 
+		if v.allowNestedRanges {
+			if r1.End.Line > r2.End.Line || (r1.End.Line == r2.End.Line && r1.End.Character >= r2.End.Character) {
+				continue
+			}
+		}
+
 		// TODO - can they touch?
 		if r1.End.Line > r2.Start.Line || (r1.End.Line == r2.Start.Line && r1.End.Character > r2.Start.Character) {
 			valid = false

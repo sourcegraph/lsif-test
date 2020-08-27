@@ -28,6 +28,7 @@ func realMain() error {
 	disableJSONSchema := app.Flag("disable-jsonschema", "Turn off JSON schema validation").Bool()
 	stopOnError := app.Flag("stop-on-error", "Stop validation after the first error.").Bool()
 	bufferCapacity := app.Flag("buffer-capacity", "Set the max line size.").Default("1000000").Int()
+	allowNestedRanges := app.Flag("allow-nested-ranges", "Allow overlapping ranges if one range is fully nested within the other.").Bool()
 
 	_, err := app.Parse(os.Args[1:])
 	if err != nil {
@@ -46,7 +47,7 @@ func realMain() error {
 	valid := true
 	scanner := bufio.NewScanner(*dumpFile)
 	scanner.Buffer(make([]byte, *bufferCapacity), *bufferCapacity)
-	validator := validation.NewValidator(schema, *disableJSONSchema)
+	validator := validation.NewValidator(schema, *disableJSONSchema, *allowNestedRanges)
 
 	formatStats := func() string {
 		numVertices, numEdges, numErrors := validator.Stats()

@@ -26,7 +26,7 @@ func (v *Visualizer) Visualize(indexFile io.Reader, fromID, subgraphDepth int) e
 	backwardEdges := invertEdges(forwardEdges)
 	vertices := map[int]struct{}{}
 	getReachableVerticesAtDepth(fromID, forwardEdges, backwardEdges, subgraphDepth, vertices)
-	fmt.Println(len(vertices))
+
 	fmt.Printf("digraph G {\n")
 
 	var b bytes.Buffer

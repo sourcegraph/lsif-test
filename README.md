@@ -1,21 +1,9 @@
-# Language Server Indexing Format Testing Utilities
+# LSIF development and testing utilities
 
-🚨 This implementation is still in very early stage and follows the latest LSIF specification closely.
+## lsif-validate
 
-## Language Server Index Format
+This command validates the output of an LSIF indexer. The following properties are validated:
 
-This repository host Go binaries that test the output of an [LSIF](https://github.com/Microsoft/language-server-protocol/blob/master/indexFormat/specification.md) indexer.
-
-## Quickstart
-
-1. Download and build this program via `go get github.com/sourcegraph/lsif-test/cmd/lsif-validate`.
-2. The binary `lsif-validate` should be installed into your `$GOPATH/bin` directory.
-3. Make sure you have added `$GOPATH/bin` to your `$PATH` environment variable.
-4. Run `lsif-validate ./path/to/dump.lsif` to see if there are errors.
-
-The validator is a beefier version of `lsif-util validate` and checks the following properties:
-
-- Each JSON line conforms to the JSON schema specification of a vertex or edge
 - Element IDs are unique
 - All references of element occur after its definition
 - A single metadata vertex exists and is the firsts element in the dump
@@ -38,7 +26,7 @@ The validator is a beefier version of `lsif-util validate` and checks the follow
     | `nextMoniker`             | `moniker`                  | `moniker`           | |
     | `packageInformation`      | `packageInformation`       | `moniker`           | |
 
-- Each vertex is reachable from a range vertex (*ignored: metadata, project, document, and event vertices*)
+- Each vertex is reachable from a range or document vertex (*ignored: metadata, project, document, and event vertices*)
 - Each range belongs to a unique document
-- No two ranges belonging to the same document overlap
-- The inVs of each `item` edge belong to that document refered to by the edge's `document` field
+- No two ranges belonging to the same document improperly overlap
+- The inVs of each `item` edge belong to that document referred to by the edge's `document` field

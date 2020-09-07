@@ -9,5 +9,5 @@ require (
 	github.com/efritz/pentimento v0.0.0-20190429011147-ade47d831101
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/sourcegraph/lsif-protocol v0.0.0-20200827160057-a19523f6b596
+	github.com/sourcegraph/lsif-protocol v1.0.0
 )

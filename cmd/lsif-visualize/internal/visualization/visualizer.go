@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strings"
 
 	reader "github.com/sourcegraph/lsif-protocol/reader"
 	reader2 "github.com/sourcegraph/lsif-test/internal/reader"
@@ -42,7 +43,9 @@ func (v *Visualizer) Visualize(indexFile io.Reader, fromID, subgraphDepth int) e
 				return true
 			}
 			payloadStr := b.String()
+			payloadStr = strings.ReplaceAll(payloadStr, "\\", "\\\\")
 			payloadStr = quoteRe.ReplaceAllString(payloadStr, `$1\"`)
+			payloadStr = strings.TrimSpace(payloadStr)
 
 			fmt.Printf("\tv%d [label=\"(%d) %s %s\"];\n", lineContext.Element.ID, lineContext.Element.ID, lineContext.Element.Label, payloadStr)
 			b.Reset()

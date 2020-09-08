@@ -12,7 +12,7 @@ import (
 	reader2 "github.com/sourcegraph/lsif-test/internal/reader"
 )
 
-var quoteRe = regexp.MustCompile(`([^\\]?)(")`)
+var quoteRe = regexp.MustCompile(`(^|[^\\]?)(")`)
 
 type Visualizer struct {
 	Context *VisualizationContext
@@ -43,8 +43,8 @@ func (v *Visualizer) Visualize(indexFile io.Reader, fromID, subgraphDepth int) e
 				return true
 			}
 			payloadStr := b.String()
-			payloadStr = strings.ReplaceAll(payloadStr, "\\", "\\\\")
 			payloadStr = quoteRe.ReplaceAllString(payloadStr, `$1\"`)
+			payloadStr = strings.ReplaceAll(payloadStr, "\\\\\"", "\\\"")
 			payloadStr = strings.TrimSpace(payloadStr)
 
 			fmt.Printf("\tv%d [label=\"(%d) %s %s\"];\n", lineContext.Element.ID, lineContext.Element.ID, lineContext.Element.Label, payloadStr)

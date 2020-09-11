@@ -1,0 +1,19 @@
+- path: protocol/emitter.go
+  line: 101
+  character: 12
+  hoverText: |
+    foo
+    bar
+    baz
+    bonk
+  definitions:
+    - path: foo
+      startLine: 3
+      startCharacter: 4
+      endLine: 3
+      endCharacter: 6
+    - path: bar
+      startLine: 4
+      startCharacter: 5
+      endLine: 4
+      endCharacter: 7

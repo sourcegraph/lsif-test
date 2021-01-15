@@ -1,5 +1,21 @@
 # LSIF development and testing utilities
 
+## Install
+
+Assumes a working Go installation:
+
+```
+# lsif-validate
+go get github.com/sourcegraph/lsif-test/cmd/lsif-validate
+
+# lsif-visualize
+go get github.com/sourcegraph/lsif-test/cmd/lsif-visualize
+```
+
+Resulting binary should then be in your `$GOPATH/bin` (conventionally `$HOME/go/bin`), so make sure thats in your `$PATH` or else invoke using absolute/relative location.
+
+Binary releases coming soon™️
+
 ## lsif-validate
 
 This command validates the output of an LSIF indexer. The following properties are validated:

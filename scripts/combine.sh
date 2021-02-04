@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -le 0 ]]
 then
-    echo 'No arguments provided.'
+    echo 'usage: ./combine.sh file1.lsif file2.lsif file3.lsif ...'
     exit 1
 fi
 

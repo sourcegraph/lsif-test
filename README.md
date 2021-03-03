@@ -1,3 +1,5 @@
+# ⚠️ This project  has been merged into [github.com/sourcegraph/sourcegraph](https://github.com/sourcegraph/sourcegraph) ⚠️
+
 # LSIF development and testing utilities
 
 ## Install
